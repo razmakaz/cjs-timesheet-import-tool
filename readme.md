@@ -20,9 +20,11 @@ It runs in a Node.js environment with version 22.
      ```
 
 ## Usage Instructions
-1. Clear out the `import` folder in the project directory.
-2. Place the spreadsheets with time data into the `import` folder.
-3. Start the development server to process the files:
+1. Ensure that the files you want to process are placed in the `import` folder in the project directory before running the app.
+> Make sure to add your import files first. There's usually 4 of them.
+2. Clear out the `import` folder in the project directory if it contains old files.
+3. Place the spreadsheets with time data into the `import` folder.
+4. Start the development server to process the files:
      - For npm users:
          ```bash
          npm run dev
