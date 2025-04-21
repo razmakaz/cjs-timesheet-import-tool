@@ -107,7 +107,7 @@ class Processor {
           shift.date,
           "MM/dd/yyyy"
         ).toFormat("ccc");
-        weekRow[dayOfWeek] = shift.hours;
+        weekRow[dayOfWeek] = parseFloat(shift.hours).toFixed(2);
       });
 
       weekScaffold.push(weekRow);
