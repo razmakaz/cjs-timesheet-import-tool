@@ -1,6 +1,10 @@
 import type { ICJSTimeRow } from "../types/ICJSTimeRow.d.ts";
-import type { IAssociateRow } from "../types/IAssociateRow";
+import type { IAssociateRow } from "../types/IAssociateRow.d.ts";
+import BOSS from "./BOSS.ts";
+import { CompassMap } from "../data/CompassMap.ts";
+import { LocationMap } from "../data/LocationMap.ts";
 import * as luxon from "luxon";
+import Fuse from "fuse.js";
 
 class Processor {
   public static async preprocessData(
@@ -42,7 +46,7 @@ class Processor {
     // console.table(data);
 
     data.forEach((row) => {
-      const associateKey = `${row["First name"]} ${row["Last name"]}`;
+      const associateKey = `${row["First name"]} ${row["Last name"]} ${row.Job}`;
       if (!associateMap[associateKey]) {
         associateMap[associateKey] = {
           "First name": row["First name"],
@@ -61,7 +65,7 @@ class Processor {
         ).toFormat("ccc"),
         hours: row["Daily total hours"],
       });
-      associateMap[associateKey].Shifts.sort((a, b) => {
+      associateMap[associateKey].Shifts.sort((a: any, b: any) => {
         return (
           luxon.DateTime.fromFormat(a.date, "MM/dd/yyyy").toMillis() -
           luxon.DateTime.fromFormat(b.date, "MM/dd/yyyy").toMillis()
@@ -69,7 +73,7 @@ class Processor {
       });
       associateMap[associateKey].Shifts = associateMap[
         associateKey
-      ].Shifts.filter((shift) => shift.hours !== "");
+      ].Shifts.filter((shift: any) => shift.hours !== "");
     });
 
     for (const associateKey in associateMap) {
@@ -102,7 +106,7 @@ class Processor {
         "Weekly total hours": associate["Weekly total hours"],
       };
 
-      associateShifts.forEach((shift) => {
+      associateShifts.forEach((shift: any) => {
         const dayOfWeek = luxon.DateTime.fromFormat(
           shift.date,
           "MM/dd/yyyy"
@@ -174,6 +178,73 @@ class Processor {
     return processedData;
   }
 
+  public static async mapAssignments(data: any[]): Promise<any[]> {
+    const mappedData: any[] = [];
+
+    console.log("Mapping assignments...");
+    console.log("Rows: ", data.length);
+
+    const assignments = (await BOSS.getAssignments()) || [];
+
+    console.log("Assignments: ", assignments.length);
+    console.log("Assignments: ", assignments.slice(0, 5));
+
+    for (const row of data) {
+      const job = row.Job;
+      const locationName = LocationMap[job] || job;
+      const compassJob = CompassMap[job] || job;
+      const firstName = row["First name"];
+      const lastName = row["Last name"];
+
+      const nameSearch = `${firstName} ${lastName}`.trim();
+      const nameFuse = new Fuse(assignments, {
+        keys: ["contractor.full_name"],
+        threshold: 0.4, // Slightly relaxed threshold for better matching
+        distance: 100, // Allow for more leniency in matching
+      });
+      const nameResults = nameFuse
+        .search(nameSearch)
+        .map((result) => result.item);
+
+      const locationSearch = `${firstName} ${lastName} ${locationName}`.trim();
+      const locationFuse = new Fuse(assignments, {
+        keys: ["contractor.full_name", "job_title"],
+        threshold: 0.5, // Adjusted threshold for less strict matching
+        distance: 100, // Allow for more leniency in matching
+      });
+      const locationResults = locationFuse
+        .search(locationSearch)
+        .map((result) => result.item);
+
+      // Fallback mechanism for unmatched results
+      if (locationResults.length === 0) {
+        const fallbackFuse = new Fuse(assignments, {
+          keys: ["job_title"],
+          threshold: 0.6,
+        });
+        locationResults.push(
+          ...fallbackFuse.search(locationName).map((result) => result.item)
+        );
+      }
+
+      let note = "";
+      if (nameResults.length === 0) {
+        note = "No contractor";
+      } else if (locationResults.length === 0) {
+        note = "No assignment";
+      }
+
+      mappedData.push({
+        "COMPASS ID": compassJob,
+        Note: note,
+        "Full Name": nameResults?.[0]?.contractor?.full_name || "",
+        ...row,
+      });
+    }
+
+    return mappedData;
+  }
+
   public static async generateSummary(data: any[]): Promise<any[]> {
     // Build an identical structure to the original data but only with the total hours in each of the Reg, OT, and DT columns then a grand total hours column
     const summaryData: any[] = [];
@@ -194,7 +265,7 @@ class Processor {
   }
 
   public static async generateReport(
-    data: ICjsTimeRow[],
+    data: ICJSTimeRow[],
     options: {
       ignoreDT?: boolean;
       convertTimeToDecimal?: boolean;
@@ -208,8 +279,10 @@ class Processor {
     const weekScaffold = await this.buildWeekScaffold(associateScaffold);
     const overtimeData = await this.processOvertime(weekScaffold, ignoreDT);
 
+    const mappedData = await this.mapAssignments(overtimeData);
+
     const postProcessedData = await this.postProcessData(
-      overtimeData,
+      mappedData,
       convertTimeToDecimal
     );
 

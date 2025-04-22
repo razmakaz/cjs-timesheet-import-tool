@@ -1,24 +1,25 @@
 import xlsx from "xlsx";
 import fs from "fs";
-import type { ICJSTimeRow } from "../types/ICJSTimeRow.js";
+import type { ICJSTimeRow } from "../types/ICJSTimeRow.d.ts";
 
 class IO {
   private static async getFiles(directory: string): Promise<File[]> {
-    const files: File[] = [];
-    fs.readdirSync(directory).forEach((file) => {
+    type thing = File & any;
+    const files: thing[] = [];
+    fs.readdirSync(directory).forEach(async (file) => {
       const filePath = `${directory}/${file}`;
       const stats = fs.statSync(filePath);
       if (stats.isFile() && (file.endsWith(".xlsx") || file.endsWith(".xls"))) {
         files.push({ path: filePath, name: file });
       } else if (stats.isDirectory()) {
-        const subFiles = this.getFiles(filePath);
+        const subFiles = await this.getFiles(filePath);
         files.push(...subFiles);
       }
     });
     return files;
   }
 
-  private static async importFile(file: File): Promise<any[]> {
+  private static async importFile(file: File & any): Promise<any[]> {
     const workbook = xlsx.readFile(file.path);
     const sheetNames = workbook.SheetNames;
     const data: any[] = [];
@@ -30,9 +31,9 @@ class IO {
         raw: false,
       });
       if (jsonData.length > 0) {
-        const headers = jsonData[0];
+        const headers = jsonData[0] as any[];
         const rows = jsonData.slice(1);
-        rows.forEach((row) => {
+        rows.forEach((row: any) => {
           const rowData: any = {};
           headers.forEach((header: string, index: number) => {
             rowData[header] = String(row[index] || ""); // Ensure all values are strings
@@ -60,10 +61,14 @@ class IO {
   }
 
   public static async export(data: any[], filePath: string): Promise<void> {
-    const worksheet = xlsx.utils.json_to_sheet(data);
-    const workbook = xlsx.utils.book_new();
-    xlsx.utils.book_append_sheet(workbook, worksheet, "Sheet1");
-    xlsx.writeFile(workbook, filePath);
+    const headers = Object.keys(data[0] || {});
+    const rows = data.map((row) =>
+      headers
+        .map((header) => `"${String(row[header] || "").replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const csvContent = [headers.join(","), ...rows].join("\n");
+    fs.writeFileSync(filePath, csvContent, "utf8");
     console.log(`Exported data to ${filePath}`);
   }
 }

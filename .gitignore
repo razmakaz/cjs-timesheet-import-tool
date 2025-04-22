@@ -14,3 +14,7 @@ import/*
 !import/
 export/*
 !export/
+backup/*
+!backup/
+
+.env
