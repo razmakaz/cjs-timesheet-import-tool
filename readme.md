@@ -1,5 +1,4 @@
 # CJS Timesheet Conversion Tool
-
 This tool is designed to process and convert timesheet data from spreadsheets. 
 It runs in a Node.js environment with version 22.
 
@@ -20,7 +19,10 @@ It runs in a Node.js environment with version 22.
      ```
 
 ## Usage Instructions
-1. Ensure that the files you want to process are placed in the `import` folder in the project directory before running the app.
+1. Ensure that the `import` and `export` folders exist in the root project directory, not `src`. If they do not exist, create them manually:
+     ```bash
+     mkdir -p import export
+     ```
 2. Clear out the `import` folder in the project directory if it contains old files.
 3. Place the spreadsheets with time data into the `import` folder.
 > Make sure to add your import files first. There's usually 4 of them.
