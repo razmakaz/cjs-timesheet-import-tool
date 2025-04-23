@@ -23,7 +23,7 @@ if (!fs.existsSync(exportDir)) {
 const data = await IO.import(process.cwd().toString() + "/import");
 
 const processed = await Processor.generateReport(data, {
-  ignoreDT: true,
+  ignoreOT: true,
   convertTimeToDecimal: true,
 });
 console.table(processed);

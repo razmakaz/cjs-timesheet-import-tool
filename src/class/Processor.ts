@@ -122,7 +122,7 @@ class Processor {
 
   public static async processOvertime(
     data: any[],
-    ignoreDT = true
+    ignoreOT: boolean = false
   ): Promise<any[]> {
     const overtimeData: any[] = [];
 
@@ -132,9 +132,15 @@ class Processor {
 
     data.forEach((associate) => {
       const totalHours = parseFloat(associate["Weekly total hours"]) || 0;
-      const regularHours = Math.min(totalHours, 40);
-      const overtimeHours = Math.max(totalHours - 40, 0);
-      const doubleTimeHours = ignoreDT ? 0 : Math.max(overtimeHours - 20, 0);
+      let regularHours = totalHours;
+      let overtimeHours = 0;
+      let doubleTimeHours = 0;
+
+      if (!ignoreOT) {
+        regularHours = Math.min(totalHours, 40);
+        overtimeHours = Math.max(totalHours - 40, 0);
+        doubleTimeHours = Math.max(overtimeHours - 20, 0);
+      }
 
       const { "Weekly total hours": _, ...rest } = associate;
 
@@ -199,8 +205,8 @@ class Processor {
       const nameSearch = `${firstName} ${lastName}`.trim();
       const nameFuse = new Fuse(assignments, {
         keys: ["contractor.full_name"],
-        threshold: 0.4, // Slightly relaxed threshold for better matching
-        distance: 100, // Allow for more leniency in matching
+        threshold: 0.5, // Slightly relaxed threshold for better matching
+        distance: 800, // Allow for more leniency in matching
       });
       const nameResults = nameFuse
         .search(nameSearch)
@@ -267,17 +273,17 @@ class Processor {
   public static async generateReport(
     data: ICJSTimeRow[],
     options: {
-      ignoreDT?: boolean;
+      ignoreOT?: boolean;
       convertTimeToDecimal?: boolean;
     } = {}
   ): Promise<any> {
-    const { ignoreDT = false, convertTimeToDecimal = true } = options;
+    const { ignoreOT = false, convertTimeToDecimal = true } = options;
     const preprocessedData = await this.preprocessData(data);
     const associateScaffold = await this.buildAssociateScaffold(
       preprocessedData
     );
     const weekScaffold = await this.buildWeekScaffold(associateScaffold);
-    const overtimeData = await this.processOvertime(weekScaffold, ignoreDT);
+    const overtimeData = await this.processOvertime(weekScaffold, ignoreOT);
 
     const mappedData = await this.mapAssignments(overtimeData);
 
